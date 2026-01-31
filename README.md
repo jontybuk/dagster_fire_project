@@ -36,13 +36,11 @@ The project implements a medallion architecture with three distinct layers, orch
 ### 🥈 Silver Layer (Cleansed & Standardised)
 
 - **`fire_stats_silver`**:
-
   - Standardises column headers (snake_case, removes prefixes).
   - Enforces numeric types for analysis columns.
   - Calculates Financial Year (e.g., "2023/24") from incident dates to align with government reporting standards.
 
 - **`population_silver`**:
-
   - Unpivots (Melts) population data from "Wide" to "Long" format.
   - Imputes missing years (Windsorising) to create a continuous 2010–2025 timeline.
 
@@ -191,6 +189,7 @@ Open browser: Navigate to http://localhost:3000
 ## 🎯 Asset Dependencies
 
 ```mermaid
+graph TD
 A[fire_stats_bronze_all] --> B[fire_stats_silver]
 C[ons_data_bronze] --> D[population_silver]
 C --> E[geography_lookups_silver]
