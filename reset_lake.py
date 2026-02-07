@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURATION ---
-LAKE_ROOT = Path(os.environ["DAGSTER_LAKE_ROOT"])
+LAKE_ROOT = Path(os.getenv("DAGSTER_LAKE_ROOT") or os.environ["LAKE_ROOT"])
 
 # Folders to completely obliterate (The Output Layers)
 RESET_DIRS = ["Bronze", "Silver", "Gold"]

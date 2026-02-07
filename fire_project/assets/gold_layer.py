@@ -6,7 +6,7 @@ from deltalake import write_deltalake, DeltaTable
 from .utils import save_and_vacuum
 
 # --- CONFIGURATION ---
-LAKE_ROOT = Path(os.environ["DAGSTER_LAKE_ROOT"])
+LAKE_ROOT = Path(os.getenv("DAGSTER_LAKE_ROOT") or os.environ["LAKE_ROOT"])
 SILVER_ONS_ROOT = LAKE_ROOT / "Silver" / "ONS_Data"
 SILVER_FIRE_ROOT = LAKE_ROOT / "Silver" / "GovUK_FireStats"
 SILVER_EXT_ROOT = LAKE_ROOT / "Silver" / "External_Data" 

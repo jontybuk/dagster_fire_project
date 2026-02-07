@@ -19,7 +19,7 @@ SOURCE_URL = "https://www.gov.uk/government/statistics/fire-statistics-incident-
 NFCC_URL = "https://nfcc.org.uk/wp-content/uploads/2023/09/Family-Groups-Summary-Data_0.xlsx"
 
 # Configurable Lake Root
-LAKE_ROOT_BASE = Path(os.environ["DAGSTER_LAKE_ROOT"])
+LAKE_ROOT_BASE = Path(os.getenv("DAGSTER_LAKE_ROOT") or os.environ["LAKE_ROOT"])
 
 # Landing Paths (Physical Files)
 LANDING_ROOT = LAKE_ROOT_BASE / "Landing" / "GovUK_FireStats"

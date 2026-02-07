@@ -1,5 +1,20 @@
-# Dagster
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environments
 .env
+venv/
+.venv/
+
+# Dagster
 .dagster/
 dagster.yaml
 workspace.yaml
+*.db
+logs/
+tmp/
