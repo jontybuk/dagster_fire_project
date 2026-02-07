@@ -18,3 +18,11 @@ workspace.yaml
 *.db
 logs/
 tmp/
+
+# Data (Keep this local only!)
+data/
+storage/
+
+# Junk Dagster folders
+temp_dagster_home_*/
+history.sqlite
