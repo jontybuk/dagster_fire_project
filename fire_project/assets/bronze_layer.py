@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import os
 import re
+import email.utils
 from io import BytesIO 
 from bs4 import BeautifulSoup
 from dagster import asset, MaterializeResult, AssetExecutionContext
@@ -17,13 +18,16 @@ from .utils import save_and_vacuum
 SOURCE_URL = "https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets"
 NFCC_URL = "https://nfcc.org.uk/wp-content/uploads/2023/09/Family-Groups-Summary-Data_0.xlsx"
 
+# Configurable Lake Root
+LAKE_ROOT_BASE = Path(os.environ["DAGSTER_LAKE_ROOT"])
+
 # Landing Paths (Physical Files)
-LANDING_ROOT = Path(r"C:\DataLake_JB\Landing\GovUK_FireStats")
-LANDING_EXT_ROOT = Path(r"C:\DataLake_JB\Landing\External_Data") # New Landing Folder
+LANDING_ROOT = LAKE_ROOT_BASE / "Landing" / "GovUK_FireStats"
+LANDING_EXT_ROOT = LAKE_ROOT_BASE / "Landing" / "External_Data"
 
 # Bronze Paths (Delta Tables)
-BRONZE_ROOT = Path(r"C:\DataLake_JB\Bronze\GovUK_FireStats")
-BRONZE_EXT_ROOT = Path(r"C:\DataLake_JB\Bronze\External_Data") 
+BRONZE_ROOT = LAKE_ROOT_BASE / "Bronze" / "GovUK_FireStats"
+BRONZE_EXT_ROOT = LAKE_ROOT_BASE / "Bronze" / "External_Data"
 
 # ==============================================================================
 # ASSET 1: GOV.UK FIRE STATISTICS (Existing Scraper)
@@ -80,16 +84,26 @@ def fire_stats_bronze_all(context: AssetExecutionContext):
         if group_name not in local_file_map:
             local_file_map[group_name] = []
         local_file_map[group_name].append(local_filepath)
+        
+        # Conditional Download Check
+        headers = {}
+        if local_filepath.exists():
+            mtime = os.path.getmtime(local_filepath)
+            headers['If-Modified-Since'] = email.utils.formatdate(mtime, usegmt=True)
 
         # Download
-        context.log.info(f"  💾 Downloading {i+1}/{len(download_queue)}: {filename} (Group: {group_name})")
+        context.log.info(f"  Checking {i+1}/{len(download_queue)}: {filename} (Group: {group_name})")
         
         try:
-            with session.get(url, stream=True, timeout=120) as r:
-                r.raise_for_status()
-                with open(local_filepath, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192): 
-                        f.write(chunk)
+            with session.get(url, stream=True, timeout=120, headers=headers) as r:
+                if r.status_code == 304:
+                    context.log.info(f"    ⏭️ Skipped (Not Modified).")
+                else:
+                    r.raise_for_status()
+                    context.log.info(f"    ⬇️ Downloading...")
+                    with open(local_filepath, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192): 
+                            f.write(chunk)
             time.sleep(3) 
             
         except Exception as e:
@@ -102,7 +116,10 @@ def fire_stats_bronze_all(context: AssetExecutionContext):
     for group_name, file_paths in local_file_map.items():
         context.log.info(f"⚙️ Processing Group: '{group_name}' ({len(file_paths)} files)...")
         
-        dfs = []
+        target_table_path = BRONZE_ROOT / group_name
+        first_write = True
+        group_row_count = 0
+        
         for filepath in file_paths:
             if not filepath.exists(): continue 
                 
@@ -123,6 +140,7 @@ def fire_stats_bronze_all(context: AssetExecutionContext):
                         context.log.warning(f"    ⚠️ Skipping {filepath.name}: No valid sheets found.")
                         continue
                 
+                file_dfs = []
                 # Loop Sheets
                 for sheet in year_sheets:
                     df = pd.read_excel(filepath, sheet_name=sheet, engine="calamine")
@@ -139,17 +157,25 @@ def fire_stats_bronze_all(context: AssetExecutionContext):
                         df["sheet_financial_year"] = formatted_year
 
                     df = df.astype(str)
-                    dfs.append(df)
+                    file_dfs.append(df)
+                
+                # Incremental Write per File
+                if file_dfs:
+                    file_combined_df = pd.concat(file_dfs, ignore_index=True)
+                    
+                    mode = "overwrite" if first_write else "append"
+                    schema_mode = "overwrite" if first_write else "merge"
+                    
+                    save_and_vacuum(file_combined_df, target_table_path, context, mode=mode, schema_mode=schema_mode)
+                    
+                    group_row_count += len(file_combined_df)
+                    first_write = False
                 
             except Exception as e:
                 context.log.error(f"    ❌ Error reading {filepath.name}: {e}")
 
-        # Save Group
-        if dfs:
-            final_df = pd.concat(dfs, ignore_index=True)
-            target_table_path = BRONZE_ROOT / group_name
-            save_and_vacuum(final_df, target_table_path, context)
-            results_summary[group_name] = len(final_df)
+        if not first_write:
+            results_summary[group_name] = group_row_count
 
     return MaterializeResult(metadata={"Groups Processed": str(list(results_summary.keys())), "Row Counts": str(results_summary)})
 
@@ -173,14 +199,22 @@ def nfcc_family_group_bronze(context: AssetExecutionContext):
     
     # 2. Download to Landing (Physical File)
     context.log.info(f"📥 Downloading NFCC Data to {local_landing_path}...")
-    try:
-        response = requests.get(NFCC_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        response.raise_for_status()
+    
+    headers = {}
+    if local_landing_path.exists():
+        mtime = os.path.getmtime(local_landing_path)
+        headers['If-Modified-Since'] = email.utils.formatdate(mtime, usegmt=True)
         
-        with open(local_landing_path, 'wb') as f:
-            f.write(response.content)
-            
-        context.log.info("✅ Download complete.")
+    try:
+        response = requests.get(NFCC_URL, headers={**headers, 'User-Agent': 'Mozilla/5.0'}, timeout=60)
+        
+        if response.status_code == 304:
+            context.log.info("   ⏭️ Skipped (Not Modified).")
+        else:
+            response.raise_for_status()
+            with open(local_landing_path, 'wb') as f:
+                f.write(response.content)
+            context.log.info("✅ Download complete.")
         
     except Exception as e:
         raise Exception(f"❌ Failed to download NFCC data: {e}")

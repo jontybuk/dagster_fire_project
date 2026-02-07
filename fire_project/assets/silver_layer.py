@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 import re
+import os
 from dagster import asset, MaterializeResult, AssetExecutionContext
 from pathlib import Path
 from deltalake import write_deltalake, DeltaTable
 from .utils import save_and_vacuum
 
 # --- CONFIGURATION ---
-LAKE_ROOT = Path(r"C:\DataLake_JB")
+LAKE_ROOT = Path(os.environ["DAGSTER_LAKE_ROOT"])
 BRONZE_FIRE_ROOT = LAKE_ROOT / "Bronze" / "GovUK_FireStats"
 BRONZE_ONS_ROOT = LAKE_ROOT / "Bronze" / "ONS_Data"
 BRONZE_EXT_ROOT = LAKE_ROOT / "Bronze" / "External_Data" 

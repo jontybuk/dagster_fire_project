@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 import requests
 from bs4 import BeautifulSoup
 from dagster import asset, MaterializeResult, AssetExecutionContext
@@ -7,8 +8,9 @@ from deltalake import write_deltalake, DeltaTable
 
 from deltalake import write_deltalake, DeltaTable
 from .utils import save_and_vacuum
-NOMIS_LANDING_ROOT = Path(r"C:\DataLake_JB\Landing\Nomis_Data")
-BRONZE_ROOT = Path(r"C:\DataLake_JB\Bronze\ONS_Data")
+LAKE_ROOT = Path(os.environ["DAGSTER_LAKE_ROOT"])
+NOMIS_LANDING_ROOT = LAKE_ROOT / "Landing" / "Nomis_Data"
+BRONZE_ROOT = LAKE_ROOT / "Bronze" / "ONS_Data"
 ONS_POPULATION_PAGE = "https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates"
 
 # -------------------------------------------------

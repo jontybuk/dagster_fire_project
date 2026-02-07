@@ -8,11 +8,12 @@ setup(
         "dagster-webserver",
         "pandas",
         "requests",
-        "beautifulsoup4",   # We added this
+        "beautifulsoup4",   
         "odfpy",
-        "python-calamine",  # We added this
+        "python-calamine",  
         "deltalake",
-        "dagster-deltalake"
+        "dagster-deltalake",
+        "python-dotenv"
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},
 )

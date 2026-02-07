@@ -1,9 +1,12 @@
 import shutil
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- CONFIGURATION ---
-LAKE_ROOT = Path(r"C:\DataLake_JB")
+LAKE_ROOT = Path(os.environ["DAGSTER_LAKE_ROOT"])
 
 # Folders to completely obliterate (The Output Layers)
 RESET_DIRS = ["Bronze", "Silver", "Gold"]
